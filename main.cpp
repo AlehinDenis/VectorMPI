@@ -88,24 +88,32 @@ TEST(Vector_Multiplication_Parallel_Group, Vector_Multiplication_Parallel_Group_
   }
 }
 
-
-
-
-
-
-
-
-
-
 TEST(Vector_Multiplication_Parallel_Queue, Vector_Multiplication_Parallel_Group_Works) {
   int size;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   std::vector<double> test;
-  getRandomVector(&test, 10, 0, 9);
+  getRandomVector(&test, 50, 0, 9);
   if (size > 1) {
     EXPECT_NO_THROW(vectorMultiplicationParallelQueue(&test, 3));
-    printVector(&test);
+    //printVector(&test);
+  }
+}
+
+TEST(Vector_Multiplication_Parallel_Queue, Vector_Multiplication_Parallel_Group_Test) {
+  int size, rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  std::vector<double> test;
+  getRandomVector(&test, 1000000, 0, 9);
+  if (size > 1) {
+    double startTime = MPI_Wtime();
+    vectorMultiplicationParallelQueue(&test, 3, 200000);
+    double endTime = MPI_Wtime();
+    if (rank == 0) {
+      std::cout << endTime - startTime << std::endl;
+    }
   }
 }
 

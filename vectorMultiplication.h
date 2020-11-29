@@ -15,24 +15,6 @@ void vectorMultiplicationSequential(std::vector<double>* vector, double x);
 void vectorMultiplicationParallelGroup(std::vector<double>* vector, double x);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct Task {
   std::vector<double> vector;
   double x;
@@ -63,11 +45,12 @@ public:
     const std::vector<double>* vector, int numberOfTask);
 
   void sendTask(Task task, int proc);
-  void solveTask();
-  void recvResult(); // 
+  void noMoreTaskSignal(int proc);
+  int solveTask(); // when no more task return 1
+  int recvResult(); // returns the number of the process from which it received the solution
   void scheduler(); // распределение задач по процессам
 };
 
-void vectorMultiplicationParallelQueue(std::vector<double>* vector, double x);
+void vectorMultiplicationParallelQueue(std::vector<double>* vector, double x, int _segmentationSize = 5);
 
 #endif  // VECTOR_MULTIPLICATION_H_

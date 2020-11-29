@@ -107,8 +107,8 @@ void vectorMultiplicationParallelGroup(std::vector<double>* vector, double x) {
 
 
 
-void vectorMultiplicationParallelQueue(std::vector<double>* vector, double x) {
-  TaskParallelism taskParallelism(vector, x, 5);
+void vectorMultiplicationParallelQueue(std::vector<double>* vector, double x, int _segmentationSize) {
+  TaskParallelism taskParallelism(vector, x, _segmentationSize);
   taskParallelism.scheduler();
   *vector = taskParallelism.getVector();
 }
@@ -146,22 +146,30 @@ void TaskParallelism::scheduler() {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-
+  // initialization processes with tasks
   if (rank == 0) {
-    while (result.size() != segmentationSize * countOfTasks) { // условие полного решения
-      for (int i = 1; i < size; i++) {
-        if (!task.empty() && !busyProc[i]) {
-          busyProc[i] = true;
-          sendTask(task.front(), i); // отправка задачи процессу
-          task.pop();
-        }
+    for (int i = 1; i < size; i++) {
+      if (!task.empty() && !busyProc[i]) {
+        busyProc[i] = true;
+        sendTask(task.front(), i);
+        task.pop();
       }
+    }
+  }
 
-      recvResult(); // получение решения от любого процесса
+  // send more task to processes 
+  if(rank == 0) {
+    while (result.size() != segmentationSize * countOfTasks) {
+      sendTask(task.front(), recvResult());
     }
   } else {
-    while (true) {
-      solveTask(); // решение задачи отдельно каждым процессом
+    while (solveTask() != 1);
+  }
+
+  // send processes signal, that there is no more tasks
+  if (rank == 0) {
+    for (int i = 1; i < size; i++) {
+      noMoreTaskSignal(i);
     }
   }
 }
@@ -170,6 +178,16 @@ void TaskParallelism::sendTask(Task task, int proc) {
   int size, rank;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int noMoreTask = 0;
+
+  MPI_Send(
+    &noMoreTask,
+    1,
+    MPI_INT,
+    proc,
+    1,
+    MPI_COMM_WORLD);
 
   task.vector.push_back(task.x);
   MPI_Send(
@@ -181,40 +199,62 @@ void TaskParallelism::sendTask(Task task, int proc) {
     MPI_COMM_WORLD);
 }
 
-void TaskParallelism::solveTask() {
+void TaskParallelism::noMoreTaskSignal(int proc) {
+  int noMoreTask = 1;
+
+  MPI_Send(
+    &noMoreTask,
+    1,
+    MPI_INT,
+    proc,
+    1,
+    MPI_COMM_WORLD);
+}
+
+int TaskParallelism::solveTask() {
   std::vector<double> local_vector(segmentationSize + 1);
 
+  int noMoreTask = 0;
+  MPI_Recv(
+    &noMoreTask,
+    1,
+    MPI_INT,
+    0,
+    1,
+    MPI_COMM_WORLD,
+    MPI_STATUS_IGNORE);
+
+  if (noMoreTask == 1) {
+    return 1;
+  }
+
   MPI_Request request;
-  MPI_Irecv(
+  MPI_Recv(
     &local_vector[0],
     local_vector.size(),
     MPI_DOUBLE,
     0,
     0,
     MPI_COMM_WORLD,
-    &request);
+    MPI_STATUS_IGNORE);
 
-  int flag;
-  MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
-  if (flag == 0) {
-    MPI_Cancel(&request);
-  } else {
-    for (int i = 0; i < local_vector.size() - 1; i++) {
-      local_vector[i] *= local_vector[local_vector.size() - 1];
-    }
-    local_vector.pop_back();
-
-    MPI_Send(
-      &local_vector[0],
-      local_vector.size(),
-      MPI_DOUBLE,
-      0,
-      0,
-      MPI_COMM_WORLD);
+  for (int i = 0; i < local_vector.size() - 1; i++) {
+    local_vector[i] *= local_vector[local_vector.size() - 1];
   }
+  local_vector.pop_back();
+
+  MPI_Send(
+    &local_vector[0],
+    local_vector.size(),
+    MPI_DOUBLE,
+    0,
+    0,
+    MPI_COMM_WORLD);
+
+  return 0;
 }
 
-void TaskParallelism::recvResult() {
+int TaskParallelism::recvResult() {
   std::vector<double> recv(segmentationSize);
   MPI_Status status;
 
@@ -228,4 +268,5 @@ void TaskParallelism::recvResult() {
 
   result.insert(result.end(), recv.begin(), recv.end());
   busyProc[status.MPI_SOURCE] = false;
+  return status.MPI_SOURCE;
 }
