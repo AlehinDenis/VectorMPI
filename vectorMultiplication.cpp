@@ -137,8 +137,8 @@ TaskParallelism::TaskParallelism(const std::vector<double>* vector,
     task.push(Task(getSubvector(vector, i), x, i));
   }
   
-  busyProc.resize(size, false);
-  busyProc[0] = true;
+  //busyProc.resize(size, false);
+  //busyProc[0] = true;
 }
 
 void TaskParallelism::scheduler() {
@@ -149,8 +149,7 @@ void TaskParallelism::scheduler() {
   // initialization processes with tasks
   if (rank == 0) {
     for (int i = 1; i < size; i++) {
-      if (!task.empty() && !busyProc[i]) {
-        busyProc[i] = true;
+      if (!task.empty()) {
         sendTask(task.front(), i);
         task.pop();
       }
@@ -160,7 +159,12 @@ void TaskParallelism::scheduler() {
   // send more task to processes 
   if(rank == 0) {
     while (result.size() != segmentationSize * countOfTasks) {
-      sendTask(task.front(), recvResult());
+      if (!task.empty()) {
+        sendTask(task.front(), recvResult());
+        task.pop();
+      } else {
+        recvResult();
+      }
     }
   } else {
     while (solveTask() != 1);
@@ -267,6 +271,6 @@ int TaskParallelism::recvResult() {
     &status);
 
   result.insert(result.end(), recv.begin(), recv.end());
-  busyProc[status.MPI_SOURCE] = false;
+
   return status.MPI_SOURCE;
 }

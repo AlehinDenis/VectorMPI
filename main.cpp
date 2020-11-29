@@ -109,7 +109,7 @@ TEST(Vector_Multiplication_Parallel_Queue, Vector_Multiplication_Parallel_Group_
   getRandomVector(&test, 1000000, 0, 9);
   if (size > 1) {
     double startTime = MPI_Wtime();
-    vectorMultiplicationParallelQueue(&test, 3, 200000);
+    vectorMultiplicationParallelQueue(&test, 3, 10);
     double endTime = MPI_Wtime();
     if (rank == 0) {
       std::cout << endTime - startTime << std::endl;

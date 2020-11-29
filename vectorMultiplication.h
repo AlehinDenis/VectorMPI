@@ -32,7 +32,6 @@ private:
   std::queue<Task> task;
   int segmentationSize; // кол-во элементов в каждом задании
   int countOfTasks;
-  std::vector<bool> busyProc; // занят ли процесс
   std::vector<double> result;
 
 public:
